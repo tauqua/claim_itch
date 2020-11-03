@@ -76,8 +76,8 @@ SOURCES = {
     #'https://old.reddit.com/r/FreeGameFindings/comments/hqjptv/itchio_mega_thread_6/',
     ## Disabled because it take a long time
     #'https://itch.io/c/537762/already-claimed-will-be-on-sale-again',
-    'https://old.reddit.com/r/FreeGameFindings/comments/i4ywei/itchio_mega_thread_7/',
-    'https://old.reddit.com/r/FreeGameFindings/comments/ipp4xn/itchio_mega_thread_8/',
+    # 'https://old.reddit.com/r/FreeGameFindings/comments/i4ywei/itchio_mega_thread_7/',
+    # 'https://old.reddit.com/r/FreeGameFindings/comments/ipp4xn/itchio_mega_thread_8/',
 }
 
 
@@ -234,10 +234,9 @@ def get_from_itch_xml(url, sleep_time=15):
     res = requests.get(url, headers={'User-Agent': USER_AGENT})
     if res.status_code != 200:
         res.raise_for_status()
-    soup = BeautifulSoup(res.text, 'lxml')
+    soup = BeautifulSoup(res.text, 'lxml-xml')
     items = soup.find_all('item')
     for item in items:
-        print(item)
         discountpercent = item.find('discountpercent')
         if discountpercent:
             if discountpercent.text == "100":
@@ -248,7 +247,6 @@ def get_from_itch_xml(url, sleep_time=15):
             has_more.add(item.find('link').text)
     sleep(sleep_time)
     print(f' got {len(urls)} games | {len(has_more)} collections/sales')
-    print(urls, has_more)
     return urls, has_more
 
 def get_owned_keys(sleep_time = 15):
