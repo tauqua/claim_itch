@@ -60,6 +60,9 @@ from selenium.common.exceptions import NoSuchElementException
 
 # add any itch sale/collection or reddit thread to this set
 SOURCES = {
+    ## Itch sale RSS feeds
+    'https://itch.io/games/on-sale.xml',
+    'https://itch.io/feed/sales.xml',
     ## Not updated recently
     #'https://itch.io/c/757294/games-to-help-you-stay-inside',
     #'https://itch.io/c/759545/self-isolation-on-a-budget',
@@ -83,7 +86,8 @@ PATTERNS = {
     'itch_sale': r'.+itch\.io/s/.+',
     'itch_group': r'.+itch\.io/[sc]/\d+/.+', # sale or collection
     'reddit_thread': r'.+(?P<thread>reddit\.com/r/.+/comments/.+)/.+',
-    'itch_game': r'(http://|https://)?(?P<game>.+\.itch\.io/[^/?]+)'
+    'itch_game': r'(http://|https://)?(?P<game>.+\.itch\.io/[^/?]+)',
+    'itch_xml': r'.+itch\.io/.*\.xml',
 }
 
 
@@ -217,6 +221,36 @@ def get_from_reddit_thread(url, sleep_time=15):
     print(f' got {len(urls)} games | {len(has_more)} collections/sales')
     return urls, has_more
 
+def get_from_itch_xml(url, sleep_time=15):
+    '''
+    INPUT  itch.io XML page
+    OUTPUT itch.io game urls, itch.io groups (sales, collections)
+    '''
+    global USER_AGENT, PATTERNS
+
+    urls = set()
+    has_more = set()
+
+    res = requests.get(url, headers={'User-Agent': USER_AGENT})
+    if res.status_code != 200:
+        res.raise_for_status()
+    soup = BeautifulSoup(res.text, 'lxml')
+    items = soup.find_all('item')
+    for item in items:
+        print(item)
+        discountpercent = item.find('discountpercent')
+        if discountpercent:
+            if discountpercent.text == "100":
+                urls.add(item.find('link').text)
+            continue
+        desc = item.find('description')
+        if "100%" in desc.text:
+            has_more.add(item.find('link').text)
+    sleep(sleep_time)
+    print(f' got {len(urls)} games | {len(has_more)} collections/sales')
+    print(urls, has_more)
+    return urls, has_more
+
 def get_owned_keys(sleep_time = 15):
     page = 1
     urls = set()
@@ -251,6 +285,8 @@ def get_urls(url, sleep_time=15, max_page=None):
         return get_from_itch_group(url, sleep_time, sale=True)
     elif re.match(PATTERNS['reddit_thread'], url):
         return get_from_reddit_thread(url, sleep_time)
+    elif re.match(PATTERNS['itch_xml'], url):
+        return get_from_itch_xml(url, sleep_time)
     else:
         # breakpoint()
         raise NotImplementedError(f'{url} is not supported')
