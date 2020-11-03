@@ -516,6 +516,7 @@ def main():
     arg_parser.add_argument('--show-history', action='store_true', help='show summary of history in history_file and exit')
     arg_parser.add_argument('--recheck', action='store_true', help='reload game links from SOURCES')
     arg_parser.add_argument('--recheck-groups', action='store_true', help='reload game links from discovered itch collections / sales')
+    arg_parser.add_argument('--recheck-library', action='store_true', help='reload list of already-owned games')
     arg_parser.add_argument('--enable-images', action='store_true', help='load images in the browser while claiming games')
     arg_parser.add_argument('--mute', action='store_true', help='automatically mute while claiming games')
     arg_parser.add_argument('--ignore', action='store_true', help='continue even if an error occurs when handling a game')
@@ -550,13 +551,14 @@ def main():
     itch_groups = set(filter(re.compile(PATTERNS['itch_group']).match, history['has_more']))
     check_sources = not os.path.exists(history_file) or args.recheck
     check_groups = len(itch_groups) > 0 or args.recheck_groups
-    if check_sources or check_groups:
+    if args.recheck_library:
         print('getting existing library')
         # check already owned keys
         owned_keys = get_owned_keys()
         for key in owned_keys:
             history['claimed'].add(key)
 
+    if check_sources or check_groups:
         print('will reload game urls from the internet')
         # keep getting newly discovered sales/collections
         first_pass = True
