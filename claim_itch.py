@@ -52,6 +52,7 @@ import json
 import html
 import argparse
 import requests
+import configparser
 from time import sleep, time
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -555,6 +556,7 @@ def main():
     arg_parser.add_argument('--mute', action='store_true', help='automatically mute while claiming games')
     arg_parser.add_argument('--ignore', action='store_true', help='continue even if an error occurs when handling a game')
     arg_parser.add_argument('--skip-errors', action='store_true', help='do not retry games that caused an error previously')
+    arg_parser.add_argument('--auto-login', action='store_true', help='read credentials from login.cfg and automatically login')
     args = arg_parser.parse_args()
 
     if args.history_file is not None:
@@ -573,6 +575,17 @@ def main():
     cookies = []
     with create_driver(args.enable_images, args.mute) as driver:
         driver.get('https://itch.io/login')
+        if args.auto_login:
+            config = configparser.ConfigParser()
+            config.read('login.cfg')
+            username = driver.find_element_by_name("username")
+            password = driver.find_element_by_name("password")
+
+            username.send_keys(config['DEFAULT']['Username'])
+            password.send_keys(config['DEFAULT']['Password'])
+
+            driver.find_element_by_xpath('//button[text()="Log in"]').click()
+        else:
         input('A new Firefox window was opened. Log in to itch then click enter to continue')
         cookies = driver.get_cookies()
     global session
