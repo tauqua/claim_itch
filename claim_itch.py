@@ -586,7 +586,7 @@ def main():
 
             driver.find_element_by_xpath('//button[text()="Log in"]').click()
         else:
-        input('A new Firefox window was opened. Log in to itch then click enter to continue')
+            input('A new Firefox window was opened. Log in to itch then click enter to continue')
         cookies = driver.get_cookies()
     global session
     session = requests.Session()
