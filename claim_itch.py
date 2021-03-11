@@ -52,6 +52,7 @@ import json
 import html
 import argparse
 import requests
+import configparser
 from time import sleep, time
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -60,6 +61,9 @@ from selenium.common.exceptions import NoSuchElementException
 
 # add any itch sale/collection or reddit thread to this set
 SOURCES = {
+    ## Itch sale RSS feeds
+    'https://itch.io/games/on-sale.xml',
+    'https://itch.io/feed/sales.xml',
     ## Not updated recently
     #'https://itch.io/c/757294/games-to-help-you-stay-inside',
     #'https://itch.io/c/759545/self-isolation-on-a-budget',
@@ -73,8 +77,8 @@ SOURCES = {
     #'https://old.reddit.com/r/FreeGameFindings/comments/hqjptv/itchio_mega_thread_6/',
     ## Disabled because it take a long time
     #'https://itch.io/c/537762/already-claimed-will-be-on-sale-again',
-    'https://old.reddit.com/r/FreeGameFindings/comments/i4ywei/itchio_mega_thread_7/',
-    'https://old.reddit.com/r/FreeGameFindings/comments/ipp4xn/itchio_mega_thread_8/',
+    # 'https://old.reddit.com/r/FreeGameFindings/comments/i4ywei/itchio_mega_thread_7/',
+    # 'https://old.reddit.com/r/FreeGameFindings/comments/ipp4xn/itchio_mega_thread_8/',
 }
 
 
@@ -83,7 +87,8 @@ PATTERNS = {
     'itch_sale': r'.+itch\.io/s/.+',
     'itch_group': r'.+itch\.io/[sc]/\d+/.+', # sale or collection
     'reddit_thread': r'.+(?P<thread>reddit\.com/r/.+/comments/.+)/.+',
-    'itch_game': r'(http://|https://)?(?P<game>.+\.itch\.io/[^/?]+)'
+    'itch_game': r'(http://|https://)?(?P<game>.+\.itch\.io/[^/?]+)',
+    'itch_xml': r'.+itch\.io/.*\.xml',
 }
 
 
@@ -217,6 +222,34 @@ def get_from_reddit_thread(url, sleep_time=15):
     print(f' got {len(urls)} games | {len(has_more)} collections/sales')
     return urls, has_more
 
+def get_from_itch_xml(url, sleep_time=15):
+    '''
+    INPUT  itch.io XML page
+    OUTPUT itch.io game urls, itch.io groups (sales, collections)
+    '''
+    global USER_AGENT, PATTERNS
+
+    urls = set()
+    has_more = set()
+
+    res = requests.get(url, headers={'User-Agent': USER_AGENT})
+    if res.status_code != 200:
+        res.raise_for_status()
+    soup = BeautifulSoup(res.text, 'lxml-xml')
+    items = soup.find_all('item')
+    for item in items:
+        discountpercent = item.find('discountpercent')
+        if discountpercent:
+            if discountpercent.text == "100":
+                urls.add(item.find('link').text)
+            continue
+        desc = item.find('description')
+        if "100%" in desc.text:
+            has_more.add(item.find('link').text)
+    sleep(sleep_time)
+    print(f' got {len(urls)} games | {len(has_more)} collections/sales')
+    return urls, has_more
+
 def get_owned_keys(sleep_time = 15):
     page = 1
     urls = set()
@@ -251,6 +284,8 @@ def get_urls(url, sleep_time=15, max_page=None):
         return get_from_itch_group(url, sleep_time, sale=True)
     elif re.match(PATTERNS['reddit_thread'], url):
         return get_from_reddit_thread(url, sleep_time)
+    elif re.match(PATTERNS['itch_xml'], url):
+        return get_from_itch_xml(url, sleep_time)
     else:
         # breakpoint()
         raise NotImplementedError(f'{url} is not supported')
@@ -521,6 +556,7 @@ def main():
     arg_parser.add_argument('--mute', action='store_true', help='automatically mute while claiming games')
     arg_parser.add_argument('--ignore', action='store_true', help='continue even if an error occurs when handling a game')
     arg_parser.add_argument('--skip-errors', action='store_true', help='do not retry games that caused an error previously')
+    arg_parser.add_argument('--auto-login', action='store_true', help='read credentials from login.cfg and automatically login')
     args = arg_parser.parse_args()
 
     if args.history_file is not None:
@@ -539,7 +575,18 @@ def main():
     cookies = []
     with create_driver(args.enable_images, args.mute) as driver:
         driver.get('https://itch.io/login')
-        input('A new Firefox window was opened. Log in to itch then click enter to continue')
+        if args.auto_login:
+            config = configparser.ConfigParser()
+            config.read('login.cfg')
+            username = driver.find_element_by_name("username")
+            password = driver.find_element_by_name("password")
+
+            username.send_keys(config['DEFAULT']['Username'])
+            password.send_keys(config['DEFAULT']['Password'])
+
+            driver.find_element_by_xpath('//button[text()="Log in"]').click()
+        else:
+            input('A new Firefox window was opened. Log in to itch then click enter to continue')
         cookies = driver.get_cookies()
     global session
     session = requests.Session()
