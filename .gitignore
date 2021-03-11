@@ -132,3 +132,6 @@ dmypy.json
 *.log.txt
 geckodriver.exe
 *.history.json
+
+# Private
+login.cfg
